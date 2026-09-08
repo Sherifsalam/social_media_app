@@ -1,3 +1,5 @@
+import { Response } from "express";
+
 export interface IError extends Error {
   statusCode: number;
 }
@@ -23,6 +25,7 @@ export class BadReuestExecption extends AppError {
     super(message, options, 400);
   }
 }
+
 
 export class UnauthorizedExecption extends AppError {
   constructor(message = "unauthorized", options: ErrorOptions = {}) {
@@ -75,5 +78,21 @@ export class BadGatewayExecption extends AppError {
 export class ServiceUnavailableExecption extends AppError {
   constructor(message = "service unavailable", options: ErrorOptions = {}) {
     super(message, options, 503);
+  }
+}
+
+export class SuccessResponse<T = string> {
+  constructor(
+    public data: T,
+    public message = "success",
+    public statusCode = 200,
+  ) {}
+
+  send(res: Response) {
+    return res.status(this.statusCode).json({
+      message: this.message,
+      status: this.statusCode,
+      data: this.data,
+    });
   }
 }

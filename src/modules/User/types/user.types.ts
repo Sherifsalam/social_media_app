@@ -18,7 +18,7 @@ export interface IUser {
     email:string
     password:string
     age:number
-    phone:number
+    phone:string
     gender:GenderEnum
     provider:ProviderEnum
     role: RoleEnum

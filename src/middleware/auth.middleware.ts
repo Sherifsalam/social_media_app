@@ -1,90 +1,106 @@
-// import type { NextFunction, Request, Response } from "express";
-// import { User } from "../modules/User/user.model";
-// import {
-//   BadrequestError,
-//   NotFoundError,
-// } from "../utils/error/error_handle.js";
-// import { redisClient } from "../utils/redis/redis.client";
-// import { revokeTokenKey } from "../utils/redis/redis.service";
-// import { verifyToken, verifyRefreshToken } from "../utils/token/token.js";
+import type { NextFunction, Request, Response } from "express";
+import type { HydratedDocument } from "mongoose";
+import { User } from "../modules/User/user.model";
+import type { IUser } from "../modules/User/types/user.types";
+import {
+  BadReuestExecption,
+  NotFoundExecption,
+  UnauthorizedExecption,
+} from "../utils/error/error_handle.js";
+import { redisClient } from "../DB/redis.connection";
+import { revokeTokenKey } from "../utils/redis/redis.service.js";
+import {
+  verifyToken,
+  verifyRefreshToken,
+  type TokenPayload,
+} from "../utils/token/token.js";
 
-// export const TokenType = {
-//   access: "access",
-//   refresh: "refresh",
-// } as const;
+declare global {
+  namespace Express {
+    interface Request {
+      user?: HydratedDocument<IUser>;
+      decodedToken?: TokenPayload;
+    }
+  }
+}
 
-// type TokenTypeValue = (typeof TokenType)[keyof typeof TokenType];
+export const TokenType = {
+  access: "access",
+  refresh: "refresh",
+} as const;
 
-// export const decodeToken = async (
-//   authorization: string | undefined,
-//   tokenType: TokenTypeValue = TokenType.access
-// ) => {
-//   if (!authorization || !authorization.startsWith("Bearer ")) {
-//     throw BadrequestError("in-valid authentication");
-//   }
+type TokenTypeValue = (typeof TokenType)[keyof typeof TokenType];
 
-//   const token = authorization.split(" ")[1];
+export const decodeToken = async (
+  authorization: string | undefined,
+  tokenType: TokenTypeValue = TokenType.access,
+) => {
+  if (!authorization || !authorization.startsWith("Bearer ")) {
+    throw new BadReuestExecption("in-valid authentication");
+  }
 
-//   if (!token) {
-//     throw BadrequestError("in-valid authentication");
-//   }
+  const token = authorization.split(" ")[1];
 
-//   const payload =
-//     tokenType === TokenType.access
-//       ? verifyToken(token)
-//       : verifyRefreshToken(token);
+  if (!token) {
+    throw new BadReuestExecption("in-valid authentication");
+  }
 
-//   if (!payload || typeof payload !== "object" || !("_id" in payload)) {
-//     throw BadrequestError("invalid token");
-//   }
+  const payload =
+    tokenType === TokenType.access
+      ? verifyToken(token)
+      : verifyRefreshToken(token);
 
-//   const userId = payload._id as string;
-//   const jti = payload.jti as string | undefined;
+  if (!payload || typeof payload !== "object" || !("_id" in payload)) {
+    throw new BadReuestExecption("invalid token");
+  }
 
-//   if (!jti) {
-//     throw BadrequestError("invalid token");
-//   }
+  const userId = payload._id as string;
+  const jti = payload.jti as string | undefined;
 
-//   const redisTokenKey = revokeTokenKey(userId, jti);
+  if (!jti) {
+    throw new BadReuestExecption("invalid token");
+  }
 
-//   if (!(await redisClient.get(redisTokenKey))) {
-//     throw BadrequestError("login again");
-//   }
+  const redisTokenKey = revokeTokenKey(userId, jti);
 
-//   const user = await User.findById(userId);
+  if (!(await redisClient.get(redisTokenKey))) {
+    throw new BadReuestExecption("login again");
+  }
 
-//   if (!user) {
-//     throw NotFoundError("user not found");
-//   }
+  const user = await User.findById(userId);
 
-//   return { user, decodedToken: payload };
-// };
+  if (!user) {
+    throw new NotFoundExecption("user not found");
+  }
 
-// export const authMiddleware = async (
-//   req: Request,
-//   _res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const { user, decodedToken } = await decodeToken(
-//       req.headers.authorization,
-//       TokenType.access
-//     );
-//     req.user = user as Request["user"];
-//     req.decodedToken = decodedToken as Request["decodedToken"];
-//     next();
-//   } catch (error) {
-//     next(error);
-//   }
-// };
+  return { user, decodedToken: payload };
+};
 
-// export const authorization = (roles: number[]) => {
-//   return (req: Request, _res: Response, next: NextFunction) => {
-//     if (!req.user || !roles.includes(Number(req.user.role))) {
-//       return next(
-//         BadrequestError("unauthorized - you don't have permission")
-//       );
-//     }
-//     next();
-//   };
-// };
+export const authMiddleware = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { user, decodedToken } = await decodeToken(
+      req.headers.authorization,
+      TokenType.access,
+    );
+    req.user = user;
+    req.decodedToken = decodedToken;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const authorization = (roles: number[]) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(Number(req.user.role))) {
+      return next(
+        new UnauthorizedExecption("unauthorized - you don't have permission"),
+      );
+    }
+    next();
+  };
+};
