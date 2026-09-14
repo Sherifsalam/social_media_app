@@ -1,9 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import type { HydratedDocument } from "mongoose";
-import { User } from "../modules/User/user.model";
+import { User } from "../modules/User/models/user.model";
 import type { IUser } from "../modules/User/types/user.types";
 import {
-  BadReuestExecption,
   NotFoundExecption,
   UnauthorizedExecption,
 } from "../utils/error/error_handle.js";
@@ -36,13 +35,13 @@ export const decodeToken = async (
   tokenType: TokenTypeValue = TokenType.access,
 ) => {
   if (!authorization || !authorization.startsWith("Bearer ")) {
-    throw new BadReuestExecption("in-valid authentication");
+    throw new UnauthorizedExecption("in-valid authentication");
   }
 
   const token = authorization.split(" ")[1];
 
   if (!token) {
-    throw new BadReuestExecption("in-valid authentication");
+    throw new UnauthorizedExecption("in-valid authentication");
   }
 
   const payload =
@@ -51,20 +50,20 @@ export const decodeToken = async (
       : verifyRefreshToken(token);
 
   if (!payload || typeof payload !== "object" || !("_id" in payload)) {
-    throw new BadReuestExecption("invalid token");
+    throw new UnauthorizedExecption("invalid token");
   }
 
   const userId = payload._id as string;
   const jti = payload.jti as string | undefined;
 
   if (!jti) {
-    throw new BadReuestExecption("invalid token");
+    throw new UnauthorizedExecption("invalid token");
   }
 
   const redisTokenKey = revokeTokenKey(userId, jti);
 
-  if (!(await redisClient.get(redisTokenKey))) {
-    throw new BadReuestExecption("login again");
+  if (await redisClient.get(redisTokenKey)) {
+    throw new UnauthorizedExecption("login again");
   }
 
   const user = await User.findById(userId);

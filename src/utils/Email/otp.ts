@@ -1,2 +1,3 @@
-// import { Math } from "Math";
-export const createOTP= ()=> Math.floor(Math.random()*1000000 + 99999)
+import {customAlphabet} from "nanoid"
+
+export const createOTP = customAlphabet("0123456789", 6);

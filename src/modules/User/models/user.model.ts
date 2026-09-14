@@ -1,7 +1,6 @@
 import mongoose, { HydratedDocument } from "mongoose";
-import { decrypt, encrypt } from "../../utils/security/encryption";
-import { GenderEnum, ProviderEnum, RoleEnum, IUser } from "./types/user.types";
-import { hash } from "../../utils/security/hashing";
+import { decrypt, encrypt } from "../../../utils/security/encryption";
+import { GenderEnum, ProviderEnum, RoleEnum, IUser } from "../types/user.types";
 
 const userSchema = new mongoose.Schema<IUser>(
   {
@@ -33,8 +32,8 @@ const userSchema = new mongoose.Schema<IUser>(
       enum: [GenderEnum.male, GenderEnum.female],
       required: true,
     },
-    bio:{
-      type:String,
+    bio: {
+      type: String,
     },
     provider: {
       type: Number,

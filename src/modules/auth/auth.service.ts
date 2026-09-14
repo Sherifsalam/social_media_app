@@ -1,22 +1,33 @@
-import { User } from "../User/user.model";
-import { ConfirmEmailInput, LoginInput, SignupInput } from "./auth.validation";
+import { User } from "../User/models/user.model";
+import {
+  ConfirmEmailInput,
+  LoginInput,
+  resendConfirmEmailInput,
+  SignupInput,
+} from "./auth.validation";
 import { BadReuestExecption } from "../../utils/error/error_handle";
 import { IUser } from "../User/types/user.types";
 import { sendEmail } from "../../utils/Email/SendEmail";
 import { generateHTML } from "../../utils/Email/template";
 import { createOTP } from "../../utils/Email/otp";
-import { ConfirmEmailKey, revokeTokenKey } from "../../utils/redis/redis.service.js";
+import {
+  ConfirmEmailKey,
+  revokeTokenKey,
+} from "../../utils/redis/redis.service.js";
 import { redisClient } from "../../DB/redis.connection.js";
 import { compare, hash } from "../../utils/security/hashing.js";
 import { generateToken } from "../../utils/token/token.js";
 import { nanoid } from "nanoid";
-
+import mongoose from "mongoose";
 
 class AuthServices {
-
-
   async signup(signup: SignupInput): Promise<Partial<IUser>> {
     const { username, email, gender, password, age, phone, bio } = signup;
+
+    console.log(
+      "readyState right before findOne:",
+      mongoose.connection.readyState,
+    );
 
     const isEmailExist = await User.findOne({ email });
     if (isEmailExist) {
@@ -52,7 +63,6 @@ class AuthServices {
     return userData;
   }
 
-
   async ConfirmEmail({ email, otp }: ConfirmEmailInput): Promise<void> {
     const user = await User.findOne({
       email,
@@ -80,7 +90,52 @@ class AuthServices {
     await user.save();
   }
 
+  async resendOTP({ email }: resendConfirmEmailInput): Promise<{
+    data: {
+      message: string;
+    };
+  }> {
+    const user = await User.findOne({ email });
 
+    if (!user) {
+      throw new BadReuestExecption("Invalid credentials");
+    }
+
+    if (user.confirmedAt) {
+      throw new BadReuestExecption("email already confirmed");
+    }
+
+    const key = ConfirmEmailKey(user.id);
+    const oldOTP = await redisClient.get(key);
+
+    if (oldOTP) {
+      const ttl = await redisClient.ttl(key);
+      throw new BadReuestExecption(
+        `wait ${Math.ceil(ttl / 60)} minutes to resend otp`,
+      );
+    }
+
+    const otp = createOTP();
+
+    await sendEmail({
+      to: email,
+      subject: "resend confirm email otp",
+      html: generateHTML({ name: user.username, otp }),
+    });
+
+    await redisClient.set(ConfirmEmailKey(user.id), otp, {
+      expiration: {
+        type: "EX",
+        value: 5 * 60,
+      },
+    });
+
+    return {
+      data: {
+        message: "otp sent successfully",
+      },
+    };
+  }
 
   async login({ email, password }: LoginInput): Promise<{
     data: {
@@ -98,36 +153,35 @@ class AuthServices {
       throw new BadReuestExecption("email not confirmed");
     }
 
-    if(! await compare(password , user.password)){
+    if (!(await compare(password, user.password))) {
       throw new BadReuestExecption("Invalid credentials");
     }
 
     const jwtid = nanoid(20);
 
-    const accessToken = generateToken({ _id: user.id },
+    const accessToken = generateToken(
+      { _id: user.id },
       process.env.JWT_SECRET as string,
-      { expiresIn: "1h",
-        jwtid
-       }
+      { expiresIn: "1h", jwtid },
     );
 
     const refreshToken = generateToken(
       { _id: user.id },
       process.env.JWT_REFRESH_SECRET as string,
-      { 
-        expiresIn: "7D", 
-        jwtid 
+      {
+        expiresIn: "7D",
+        jwtid,
       },
     );
 
     await redisClient.set(revokeTokenKey(user.id, jwtid), "revoked");
 
-    return{ 
-      data:{
+    return {
+      data: {
         accessToken,
-        refreshToken
-      }
-    }
+        refreshToken,
+      },
+    };
   }
 }
 

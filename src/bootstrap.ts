@@ -17,7 +17,7 @@ const app = express();
 export const bootstrap = async () => {
   app.use(express.json());
   app.use(morgan("dev"));
- 
+  app.get("/ping", (req, res) => res.json({ ok: true }));
   await connectDB();
   await redisClient.connect()
 

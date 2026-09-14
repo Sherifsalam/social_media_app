@@ -40,7 +40,13 @@ export const confimEmailSchema ={
     otp:z.string().length(6)
   }),
 }
+export const resendConfimEmailSchema ={
+  body : z.strictObject({
+    email:z.email(),
+  }),
+}
 
 export type SignupInput = z.infer<typeof signupSchema.body>;
 export type LoginInput = z.infer<typeof LoginSchema.body>;
 export type ConfirmEmailInput = z.infer<typeof confimEmailSchema.body>;
+export type resendConfirmEmailInput = z.infer<typeof resendConfimEmailSchema.body>;
