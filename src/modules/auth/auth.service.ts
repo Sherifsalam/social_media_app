@@ -10,24 +10,15 @@ import { IUser } from "../User/types/user.types";
 import { sendEmail } from "../../utils/Email/SendEmail";
 import { generateHTML } from "../../utils/Email/template";
 import { createOTP } from "../../utils/Email/otp";
-import {
-  ConfirmEmailKey,
-  revokeTokenKey,
-} from "../../utils/redis/redis.service.js";
+import { ConfirmEmailKey } from "../../utils/redis/redis.service.js";
 import { redisClient } from "../../DB/redis.connection.js";
 import { compare, hash } from "../../utils/security/hashing.js";
 import { generateToken } from "../../utils/token/token.js";
 import { nanoid } from "nanoid";
-import mongoose from "mongoose";
 
 class AuthServices {
   async signup(signup: SignupInput): Promise<Partial<IUser>> {
     const { username, email, gender, password, age, phone, bio } = signup;
-
-    console.log(
-      "readyState right before findOne:",
-      mongoose.connection.readyState,
-    );
 
     const isEmailExist = await User.findOne({ email });
     if (isEmailExist) {
@@ -49,10 +40,10 @@ class AuthServices {
     await sendEmail({
       to: email,
       subject: "confirm email",
-      html: generateHTML({ name: username, otp }),
+      html: generateHTML({ name: username, otp, expiryMinutes: 5 }),
     });
 
-    redisClient.set(ConfirmEmailKey(user.id), otp, {
+    await redisClient.set(ConfirmEmailKey(user.id), otp, {
       expiration: {
         type: "EX",
         value: 5 * 60,
@@ -120,7 +111,7 @@ class AuthServices {
     await sendEmail({
       to: email,
       subject: "resend confirm email otp",
-      html: generateHTML({ name: user.username, otp }),
+      html: generateHTML({ name: user.username, otp, expiryMinutes: 5 }),
     });
 
     await redisClient.set(ConfirmEmailKey(user.id), otp, {
@@ -149,12 +140,12 @@ class AuthServices {
       throw new BadReuestExecption("Invalid credentials");
     }
 
-    if (!user.confirmedAt) {
-      throw new BadReuestExecption("email not confirmed");
+    if (!user.password || !(await compare(password, user.password))) {
+      throw new BadReuestExecption("Invalid credentials");
     }
 
-    if (!(await compare(password, user.password))) {
-      throw new BadReuestExecption("Invalid credentials");
+    if (!user.confirmedAt) {
+      throw new BadReuestExecption("email not confirmed");
     }
 
     const jwtid = nanoid(20);
@@ -169,12 +160,10 @@ class AuthServices {
       { _id: user.id },
       process.env.JWT_REFRESH_SECRET as string,
       {
-        expiresIn: "7D",
+        expiresIn: "7d",
         jwtid,
       },
     );
-
-    await redisClient.set(revokeTokenKey(user.id, jwtid), "revoked");
 
     return {
       data: {

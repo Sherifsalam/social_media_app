@@ -1,3 +1,5 @@
+import type { Types } from "mongoose";
+
 export enum GenderEnum {
     male,
     female
@@ -16,20 +18,18 @@ export enum RoleEnum{
 export interface IUser {
     username:string
     email:string
-    password:string
+    password?:string
     age:number
     phone:string
     gender:GenderEnum
     provider:ProviderEnum
     role: RoleEnum
-    profilePicture:string
-    coverPicture:string
-    bio:string
-    posts:string[]
-    comments:string[]
-    friends:string
+    profilePicture?:string
+    coverPicture?:string
+    bio?:string
+    friends:Types.ObjectId[]
     isOnline:boolean
     isActive:boolean
-    confirmedAt:Date
-    changedCredentialsAt:Date
+    confirmedAt?:Date
+    changedCredentialsAt?:Date
 }

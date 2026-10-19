@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema<IUser>(
     bio: {
       type: String,
     },
+    friends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     provider: {
       type: Number,
       enum: [ProviderEnum.system, ProviderEnum.google],
@@ -68,12 +74,22 @@ const userSchema = new mongoose.Schema<IUser>(
     validateBeforeSave: true,
     toJSON: {
       virtuals: true,
+      transform: (_doc, ret: Partial<IUser>) => {
+        delete ret.password;
+        return ret;
+      },
     },
     toObject: {
       virtuals: true,
     },
   },
 );
+
+userSchema.virtual("posts", {
+  ref: "Post",
+  localField: "_id",
+  foreignField: "createdBy",
+});
 
 userSchema.pre("save", async function (this: HydratedDocument<IUser>) {
   // if (this.isModified("password")) {

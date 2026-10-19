@@ -10,6 +10,8 @@ import { connectDB } from "./DB/mongoose.connection";
 import{redisClient} from "./DB/redis.connection";
 import { IError } from "./utils/error/error_handle";
 import authRouter from "./modules/auth/auth.controller";
+import postRouter from "./modules/Post/post.controller";
+import friendRouter from "./modules/Friend/friend.controller";
 
 const app = express();
 
@@ -23,6 +25,8 @@ export const bootstrap = async () => {
 
 
   app.use("/auth", authRouter);
+  app.use("/post", postRouter);
+  app.use("/friend", friendRouter);
 
   const errorHandler: ErrorRequestHandler = (
     err: IError,
@@ -35,13 +39,13 @@ export const bootstrap = async () => {
     res.status(statusCode).json({
       message: err.message || "Internal server error",
       status: statusCode,
-      stack: err.stack,
+      ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
     });
   };
 
   app.use(errorHandler);
 
-  app.listen(process.env.PORT, () => {
+  app.listen(Number(process.env.PORT) || 3000, () => {
     console.log(chalk.blue(`Server is running on port ${process.env.PORT}`));
   });
 };

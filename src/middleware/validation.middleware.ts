@@ -1,5 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
-import type { ZodType } from "zod";
+import { z, type ZodType } from "zod";
+
+export const generalFields = {
+  id: z.string().regex(/^[0-9a-fA-F]{24}$/, { message: "Invalid id" }),
+};
 
 type ReqKey = "body" | "params" | "query";
 

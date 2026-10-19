@@ -9,11 +9,7 @@ export const sendEmail = async ({
   subject: string;
   html: string;
 }) => {
-  console.log("sendEmail received 'to':", JSON.stringify(to));
-
   const transporter = nodemailer.createTransport({
-    host: "",
-    port: 1500,
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
